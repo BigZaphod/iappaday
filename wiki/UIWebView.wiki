@@ -1,5 +1,3 @@
-#summary One-sentence summary of this page.
-
 = UIWebView Notes =
 
 Had to hack the UIWebView.h file a bit, but then I got it to compile and embedded a UIWebView inside of a UIScroller to give a very Safari-like experience.
