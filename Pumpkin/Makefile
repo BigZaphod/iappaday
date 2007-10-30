@@ -15,6 +15,7 @@ App:	main.o App.o SplashView.o
 		$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 package: App
+	find bundle -type f -name .DS_Store -print0 | xargs -0 rm
 	mv bundle $(APPNAME).app
 	zip -9r $(APPNAME).zip $(APPNAME).app
 	mv $(APPNAME).app bundle
