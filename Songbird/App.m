@@ -190,8 +190,7 @@ float r()
 	// A blank query gets all tracks
 	q = [[MLQuery alloc] init];
 
-	//[self showSplash];
-	[self showTurkey];
+	[self showSplash];
 }
 
 @end
