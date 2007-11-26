@@ -11,10 +11,17 @@
 	float *samples;
 	int currentSample;
 	int numberOfSamples;
+	float attackSamples;
+	float decaySamples;
+	float sustainLevel;
+	float releaseSamples;
+	int samplesUntilDecay;
+	int samplesUntilSustain;
+	int samplesUntilRelease;	
 }
 
 -(void)dealloc;
-+(id)toneWithFrequency: (float)f;
++(id)toneWithFrequency: (float)f attack: (float)a decay: (float)d sustain: (float)s release: (float)r;
 -(BOOL)isEqual: (Tone*)t;
 
 @end
@@ -24,7 +31,7 @@
 	AudioQueueRef queue;
 	AudioQueueBufferRef buffer1;
 	AudioQueueBufferRef buffer2;
-	NSMutableArray *tones;
+	NSMutableArray *playingTones;
 	float volume;
 }
 
@@ -36,5 +43,6 @@
 -(void)removeTone: (Tone*)t;
 -(void)removeAllTones;
 -(NSArray*)playingTones;
+-(BOOL)playingTone: (Tone*)t;
 
 @end

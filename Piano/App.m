@@ -39,21 +39,26 @@ extern CGPoint GSEventGetOuterMostPathPosition(struct __GSEvent*);
 	[self setGestureDelegate: self];
 	player = [p retain];
 
+	const float a = 0.02;
+	const float d = 0.05;
+	const float s = 0.9;
+	const float r = 0.03;
+
 	// white keys
-	notes[0] = [[Tone toneWithFrequency: 261.626] retain];	// C4  (middle C)
-	notes[1] = [[Tone toneWithFrequency: 293.665] retain];	// D4
-	notes[2] = [[Tone toneWithFrequency: 329.628] retain];	// E4
-	notes[3] = [[Tone toneWithFrequency: 349.228] retain];	// F4
-	notes[4] = [[Tone toneWithFrequency: 391.995] retain];	// G4
-	notes[5] = [[Tone toneWithFrequency: 440.000] retain];	// A4
-	notes[6] = [[Tone toneWithFrequency: 493.883] retain];	// B4
+	notes[0] = [[Tone toneWithFrequency: 261.626 attack: a decay: d sustain: s release: r] retain];	// C4  (middle C)
+	notes[1] = [[Tone toneWithFrequency: 293.665 attack: a decay: d sustain: s release: r] retain];	// D4
+	notes[2] = [[Tone toneWithFrequency: 329.628 attack: a decay: d sustain: s release: r] retain];	// E4
+	notes[3] = [[Tone toneWithFrequency: 349.228 attack: a decay: d sustain: s release: r] retain];	// F4
+	notes[4] = [[Tone toneWithFrequency: 391.995 attack: a decay: d sustain: s release: r] retain];	// G4
+	notes[5] = [[Tone toneWithFrequency: 440.000 attack: a decay: d sustain: s release: r] retain];	// A4
+	notes[6] = [[Tone toneWithFrequency: 493.883 attack: a decay: d sustain: s release: r] retain];	// B4
 
 	// black keys
-	notes[7] = [[Tone toneWithFrequency: 277.183] retain];	// C#4
-	notes[8] = [[Tone toneWithFrequency: 311.127] retain];	// D#4
-	notes[9] = [[Tone toneWithFrequency: 369.994] retain];	// F#4
-	notes[10]= [[Tone toneWithFrequency: 415.305] retain];	// G#4
-	notes[11]= [[Tone toneWithFrequency: 466.164] retain];	// A#4
+	notes[7] = [[Tone toneWithFrequency: 277.183 attack: a decay: d sustain: s release: r] retain];	// C#4
+	notes[8] = [[Tone toneWithFrequency: 311.127 attack: a decay: d sustain: s release: r] retain];	// D#4
+	notes[9] = [[Tone toneWithFrequency: 369.994 attack: a decay: d sustain: s release: r] retain];	// F#4
+	notes[10]= [[Tone toneWithFrequency: 415.305 attack: a decay: d sustain: s release: r] retain];	// G#4
+	notes[11]= [[Tone toneWithFrequency: 466.164 attack: a decay: d sustain: s release: r] retain];	// A#4
 
 	return self;
 }
@@ -81,10 +86,11 @@ extern CGPoint GSEventGetOuterMostPathPosition(struct __GSEvent*);
 
 -(void)playSingleTone: (Tone*)tone
 {
-	NSArray *tones = [player playingTones];
-	if( ![tones containsObject: tone] )
+	if( ![player playingTone: tone] )
 		[player addTone: tone];
+
 	int i;
+	NSArray *tones = [player playingTones];
 	for( i=0; i<[tones count]; i++ ) {
 		id o = [tones objectAtIndex: i];
 		if( ![o isEqual: tone] )
@@ -94,12 +100,13 @@ extern CGPoint GSEventGetOuterMostPathPosition(struct __GSEvent*);
 
 -(void)playOnlyTone: (Tone*)tone1 and: (Tone*)tone2
 {
-	NSArray *tones = [player playingTones];
-	if( ![tones containsObject: tone1] )
+	if( ![player playingTone: tone1] )
 		[player addTone: tone1];
-	if( ![tones containsObject: tone2] )
+	if( ![player playingTone: tone2] )
 		[player addTone: tone2];
+
 	int i;
+	NSArray *tones = [player playingTones];
 	for( i=0; i<[tones count]; i++ ) {
 		id o = [tones objectAtIndex: i];
 		if( !([o isEqual: tone1] || [o isEqual: tone2]) )
