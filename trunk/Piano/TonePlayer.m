@@ -20,7 +20,7 @@ static const int TONESamplesPerBuffer = 44100 / 25;	// enough samples for 1/25th
 
 	int i;
 	for( i=0; i<numberOfSamples; i++ )
-		samples[i] = sinf(i / samplesPerCycle * 2.0f * M_PI);
+		samples[i] = sinf( i / samplesPerCycle * 2.0f * M_PI );
 }
 
 -(BOOL)isEqual: (Tone*)t
@@ -28,23 +28,60 @@ static const int TONESamplesPerBuffer = 44100 / 25;	// enough samples for 1/25th
 	return frequency == t->frequency;
 }
 
--(id)initWithFrequency: (float)f
+-(void)startAttack
+{
+	samplesUntilDecay = attackSamples;
+	samplesUntilSustain = decaySamples;
+	samplesUntilRelease = -1;
+}
+
+-(void)startRelease
+{
+	if( samplesUntilRelease == -1 )
+		samplesUntilRelease = releaseSamples;
+}
+
+-(BOOL)releaseDone
+{
+	return samplesUntilRelease == 0;
+}
+
+-(id)initWithFrequency: (float)f attack: (float)a decay: (float)d sustain: (float)s release: (float)r
 {
 	[super init];
 	frequency = f;
+	attackSamples = 44100 * a;
+	decaySamples = 44100 * d;
+	sustainLevel = s;
+	releaseSamples = 44100 * r;
 	[self _generateToneSamples];
 	return self;
 }
 
-+(id)toneWithFrequency: (float)f
++(id)toneWithFrequency: (float)f attack: (float)a decay: (float)d sustain: (float)s release: (float)r
 {
-	return [[[Tone alloc] initWithFrequency: f] autorelease];
+	return [[[Tone alloc] initWithFrequency: f attack: a decay: d sustain: s release: r] autorelease];
 }
 
 -(float)nextSample
 {
 	currentSample = (currentSample == numberOfSamples-1)? 0: currentSample+1;
-	return samples[currentSample];
+	float amplitude;
+	if( samplesUntilDecay >= 0 ) {
+		amplitude = 1.0 - (samplesUntilDecay / attackSamples);
+		samplesUntilDecay--;
+	} else if( samplesUntilSustain >= 0 ) {
+		amplitude = sustainLevel + ((1.0 - sustainLevel) * (samplesUntilSustain / decaySamples));
+		samplesUntilSustain--;
+	} else if( samplesUntilRelease > 0 ) {
+		amplitude = sustainLevel * (samplesUntilRelease / releaseSamples);
+		samplesUntilRelease--;
+	} else if( samplesUntilRelease == 0 ) {
+		amplitude = 0;
+	} else {
+		amplitude = sustainLevel;
+	}
+	return samples[currentSample] * amplitude;
 }
 
 -(void)dealloc
@@ -62,7 +99,7 @@ static const int TONESamplesPerBuffer = 44100 / 25;	// enough samples for 1/25th
 -(void)dealloc
 {
 	AudioQueueDispose( queue, true );	// also destroys the buffers
-	[tones release];
+	[playingTones release];
 	[super dealloc];
 }
 
@@ -73,10 +110,11 @@ static void AQBufferCallback( void *in, AudioQueueRef inQ, AudioQueueBufferRef o
 	short *buffer = (short*)outQB->mAudioData;
 	int currentSample;
 	int sampleSlot = 0;
+	int i;
 
 	const short amplitude = (short)(32000.0f * player->volume);
-	const NSArray *tones = player->tones;
-	const int numberOfTones = [tones count];
+	NSArray *playingTones = [NSArray arrayWithArray: player->playingTones];
+	const int numberOfTones = [playingTones count];
 
 	// note, this will "play" silence if no tones are presently registered with the tone player
 	// this keeps the playback loop running.. probably not ideal - but easy :)
@@ -89,20 +127,27 @@ static void AQBufferCallback( void *in, AudioQueueRef inQ, AudioQueueBufferRef o
 
 		float sampleValue = 0;
 		if( numberOfTones ) {
-			int i;
-			for( i=0; i<numberOfTones; i++ ) 
-				sampleValue += [[tones objectAtIndex: i] nextSample];
-			sampleValue /= numberOfTones;
+			for( i=0; i<numberOfTones; i++ ) {
+				float s = [[playingTones objectAtIndex: i] nextSample] + 1.0f;
+				sampleValue = sampleValue + s - ((sampleValue * s) / 2.0f);
+			}
 		}
 
 		sampleValue *= amplitude;
-		short s = (short)sampleValue;
+		short s = (short)(sampleValue - 1.0f);
 		buffer[sampleSlot++] = s;
 		buffer[sampleSlot++] = s;
 	}
 
 	outQB->mAudioDataByteSize = sizeof(short) * sampleSlot;
 	AudioQueueEnqueueBuffer(inQ, outQB, 0, NULL);
+
+	// check for tones that are done with the release phase and then remove them from the player
+	for( i=0; i<numberOfTones; i++ ) {
+		Tone *t = [playingTones objectAtIndex: i];
+		if( [t releaseDone] )
+			[player->playingTones removeObject: t];
+	}
 }
 
 -(void)syncWithSystemVolume
@@ -118,7 +163,7 @@ static void AQBufferCallback( void *in, AudioQueueRef inQ, AudioQueueBufferRef o
 
 	audioFormat.mSampleRate = 44100.0;
 	audioFormat.mFormatID = kAudioFormatLinearPCM;
-	audioFormat.mFormatFlags = kLinearPCMFormatFlagIsSignedInteger; // | kAudioFormatFlagIsPacked;
+	audioFormat.mFormatFlags = kLinearPCMFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
 	audioFormat.mBytesPerPacket = 4;
 	audioFormat.mFramesPerPacket = 1;
 	audioFormat.mBytesPerFrame = 4;
@@ -137,7 +182,7 @@ static void AQBufferCallback( void *in, AudioQueueRef inQ, AudioQueueBufferRef o
 	err = AudioQueueAllocateBuffer( queue, audioFormat.mBytesPerFrame * TONESamplesPerBuffer, &buffer2 );
 	if( err ) printf( "AudioQueueAllocateBuffer 2 error\n" );
 
-	tones = [[NSMutableArray alloc] init];
+	playingTones = [[NSMutableArray alloc] init];
 
 	AVSystemController *avs = [AVSystemController sharedAVSystemController];
 	[[NSNotificationCenter defaultCenter] addObserver: self selector:@selector(volumeChanged:) name:@"AVSystemController_SystemVolumeDidChangeNotification" object: avs];
@@ -170,22 +215,30 @@ static void AQBufferCallback( void *in, AudioQueueRef inQ, AudioQueueBufferRef o
 
 -(void)addTone: (Tone*)t
 {
-	if( t ) [tones addObject: t];
+	[t startAttack];
+	[playingTones addObject: t];
 }
 
 -(void)removeTone: (Tone*)t
 {
-	if( t ) [tones removeObject: t];
+	[t startRelease];
 }
 
 -(void)removeAllTones
 {
-	[tones removeAllObjects];
+	int i;
+	for( i=0; i<[playingTones count]; i++ )
+		[self removeTone: [playingTones objectAtIndex: i]];
 }
 
 -(NSArray*)playingTones
 {
-	return [NSArray arrayWithArray: tones];
+	return [NSArray arrayWithArray: playingTones];
+}
+
+-(BOOL)playingTone: (Tone*)t
+{
+	return [playingTones containsObject: t];
 }
 
 @end
