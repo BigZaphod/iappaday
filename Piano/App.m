@@ -39,9 +39,9 @@ extern CGPoint GSEventGetOuterMostPathPosition(struct __GSEvent*);
 	[self setGestureDelegate: self];
 	player = [p retain];
 
-	const float a = 0.02;
-	const float d = 0.05;
-	const float s = 0.9;
+	const float a = 0.01;
+	const float d = 0.01;
+	const float s = 0.8;
 	const float r = 0.03;
 
 	// white keys
